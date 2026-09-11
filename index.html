@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎙️ 무선 음성 입력기</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f6f9; }
+    h2 { color: #333; }
+    .status-box { margin: 20px 0; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 1.2em; }
+    .listening { background-color: #e8f5e9; color: #2e7d32; border: 2px solid #a5d6a7; }
+    .stopped { background-color: #ffebee; color: #c62828; border: 2px solid #ef9a9a; }
+    button { padding: 15px 25px; font-size: 1.1em; margin: 10px 5px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    .btn-start { background-color: #2e7d32; color: white; }
+    .btn-stop { background-color: #c62828; color: white; }
+    #log { margin-top: 20px; text-align: left; background: white; padding: 15px; border-radius: 8px; height: 250px; overflow-y: auto; border: 1px solid #ddd; font-size: 0.9em; line-height: 1.5; }
+    .log-raw { color: #1565c0; }
+    .log-success { color: #2e7d32; font-weight: bold; }
+    .log-err { color: #c62828; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>🎙️ 무선 음성 입력기 (독립형)</h2>
+  <div id="status" class="status-box stopped">🔴 음성 감지 정지됨</div>
+  
+  <button class="btn-start" onclick="startRecognition()">🟢 업무 시작 (음성 감지)</button>
+  <button class="btn-stop" onclick="stopRecognition()">🔴 업무 종료 (중지)</button>
+
+  <h3>실시간 감지 기록</h3>
+  <div id="log"></div>
+
+  <script>
+    // ★ 본인의 구글 앱스 스크립트 웹 앱 URL을 아래에 넣으세요
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxzeAcbPLm29lVgz1pds9dPB0vAStIwovZnTc-Id74RwuQhPpDS-5Y_RW309KUTFxLQ/exec";
+
+    let recognition;
+    let isAutoRestart = false;
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ko-KR';
+      recognition.interimResults = false;
+      recognition.continuous = true;
+
+      recognition.onstart = function() {
+        addLog("▶️ 마이크가 활성화되었습니다. (음성 감지 중)");
+      };
+
+      recognition.onresult = function(event) {
+        const lastIndex = event.results.length - 1;
+        const text = event.results[lastIndex].transcript.trim();
+        addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
+        processVoiceText(text);
+      };
+
+      recognition.onend = function() {
+        if (isAutoRestart) {
+          try { recognition.start(); } catch(e) {}
+        } else {
+          updateStatus(false);
+          addLog("⏹️ 음성 인식 정지됨");
+        }
+      };
+
+      recognition.onerror = function(event) {
+        addLog("❌ 마이크 에러: " + event.error, "log-err");
+        if (isAutoRestart && event.error !== 'not-allowed') {
+          setTimeout(() => { if (isAutoRestart) recognition.start(); }, 1000);
+        }
+      };
+    } else {
+      alert("이 브라우저는 음성 인식을 지원하지 않습니다. 모바일 크롬 또는 사파리를 사용해 주세요.");
+    }
+
+    function startRecognition() {
+      if (!recognition) return;
+      isAutoRestart = true;
+      try {
+        recognition.start();
+        updateStatus(true);
+        requestWakeLock();
+      } catch (e) { console.log(e); }
+    }
+
+    function stopRecognition() {
+      isAutoRestart = false;
+      if (recognition) recognition.stop();
+      updateStatus(false);
+    }
+
+    function updateStatus(listening) {
+      const statusDiv = document.getElementById('status');
+      if (listening) {
+        statusDiv.className = 'status-box listening';
+        statusDiv.innerHTML = '🟢 음성 감지 중 (대기 상태)';
+      } else {
+        statusDiv.className = 'status-box stopped';
+        statusDiv.innerHTML = '🔴 음성 감지 정지됨';
+      }
+    }
+
+    function processVoiceText(text) {
+      let cleanedName = text.replace(/환자|님|들어오세요|다음|입니다/g, '').trim();
+      
+      if (cleanedName.length >= 2 && cleanedName.length <= 4) {
+        addLog("✨ 이름 추출: [" + cleanedName + "] ➔ 구글 시트 전송 중...", "log-success");
+        
+        // 구글 시트로 HTTP GET 전송
+        fetch(GAS_WEB_APP_URL + "?action=add&name=" + encodeURIComponent(cleanedName), { mode: 'no-cors' })
+          .then(() => {
+            addLog("✅ 구글 시트 전송 요청 완료!", "log-success");
+          })
+          .catch(err => {
+            addLog("❌ 전송 실패: " + err.message, "log-err");
+          });
+      } else {
+        addLog("ℹ️ [" + cleanedName + "]: 2~4글자 조건에 맞지 않아 전송 제외됨");
+      }
+    }
+
+    function addLog(msg, cssClass) {
+      const logDiv = document.getElementById('log');
+      const p = document.createElement('p');
+      if (cssClass) p.className = cssClass;
+      p.style.margin = "4px 0";
+      p.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
+      logDiv.prepend(p);
+    }
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {}
+    }
+  </script>
+</body>
+</html>
