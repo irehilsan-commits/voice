@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <h2>🎙️ 무선 음성 입력기 (독립형)</h2>
+  <h2>🎙️ 무선 음성 입력기 (모바일 최적화 v3)</h2>
   <div id="status" class="status-box stopped">🔴 음성 감지 정지됨</div>
   
   <button class="btn-start" onclick="startRecognition()">🟢 업무 시작 (음성 감지)</button>
@@ -30,7 +30,7 @@
   <div id="log"></div>
 
   <script>
-    // ★ 본인의 구글 앱스 스크립트 웹 앱 URL을 아래에 넣으세요
+    // ★ 구글 앱스 스크립트 웹 앱 URL
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxzeAcbPLm29lVgz1pds9dPB0vAStIwovZnTc-Id74RwuQhPpDS-5Y_RW309KUTFxLQ/exec";
 
     let recognition;
@@ -41,22 +41,33 @@
       recognition = new SpeechRecognition();
       recognition.lang = 'ko-KR';
       recognition.interimResults = false;
-      recognition.continuous = true;
+      // ★ 모바일 호환성을 위해 continuous = false 설정
+      recognition.continuous = false;
 
       recognition.onstart = function() {
-        addLog("▶️ 마이크가 활성화되었습니다. (음성 감지 중)");
+        addLog("▶️ 마이크 활성화됨 (소리를 들을 준비 완료)");
       };
 
       recognition.onresult = function(event) {
-        const lastIndex = event.results.length - 1;
-        const text = event.results[lastIndex].transcript.trim();
-        addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
-        processVoiceText(text);
+        try {
+          const lastIndex = event.results.length - 1;
+          // ★ [핵심 수정] event.results[lastIndex].transcript 구문으로 정확히 접근
+          const text = event.results[lastIndex].transcript.trim();
+          addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
+          processVoiceText(text);
+        } catch(e) {
+          addLog("❌ 결과 처리 중 오류: " + e.message, "log-err");
+        }
       };
 
       recognition.onend = function() {
         if (isAutoRestart) {
-          try { recognition.start(); } catch(e) {}
+          // 음성이 인식되거나 끊기면 0.3초 후 자동으로 마이크 재가동
+          setTimeout(() => {
+            if (isAutoRestart) {
+              try { recognition.start(); } catch(e) {}
+            }
+          }, 300);
         } else {
           updateStatus(false);
           addLog("⏹️ 음성 인식 정지됨");
@@ -64,6 +75,10 @@
       };
 
       recognition.onerror = function(event) {
+        // no-speech 오류는 소리가 안 들려 타임아웃된 것이므로 로그 생략 후 자동 재시작
+        if (event.error === 'no-speech') {
+          return;
+        }
         addLog("❌ 마이크 에러: " + event.error, "log-err");
         if (isAutoRestart && event.error !== 'not-allowed') {
           setTimeout(() => { if (isAutoRestart) recognition.start(); }, 1000);
@@ -106,7 +121,6 @@
       if (cleanedName.length >= 2 && cleanedName.length <= 4) {
         addLog("✨ 이름 추출: [" + cleanedName + "] ➔ 구글 시트 전송 중...", "log-success");
         
-        // 구글 시트로 HTTP GET 전송
         fetch(GAS_WEB_APP_URL + "?action=add&name=" + encodeURIComponent(cleanedName), { mode: 'no-cors' })
           .then(() => {
             addLog("✅ 구글 시트 전송 요청 완료!", "log-success");
