@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <h2>🎙️ 무선 음성 입력기 (모바일 최적화 v3)</h2>
+  <h2>🎙️ 무선 음성 입력기 (v4)</h2>
   <div id="status" class="status-box stopped">🔴 음성 감지 정지됨</div>
   
   <button class="btn-start" onclick="startRecognition()">🟢 업무 시작 (음성 감지)</button>
@@ -41,7 +41,6 @@
       recognition = new SpeechRecognition();
       recognition.lang = 'ko-KR';
       recognition.interimResults = false;
-      // ★ 모바일 호환성을 위해 continuous = false 설정
       recognition.continuous = false;
 
       recognition.onstart = function() {
@@ -51,8 +50,8 @@
       recognition.onresult = function(event) {
         try {
           const lastIndex = event.results.length - 1;
-          // ★ [핵심 수정] event.results[lastIndex].transcript 구문으로 정확히 접근
-          const text = event.results[lastIndex].transcript.trim();
+          // ★ [핵심 수정] event.results[lastIndex][0].transcript 구문으로 배열 인덱스 [0] 추가
+          const text = event.results[lastIndex][0].transcript.trim();
           addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
           processVoiceText(text);
         } catch(e) {
@@ -62,7 +61,6 @@
 
       recognition.onend = function() {
         if (isAutoRestart) {
-          // 음성이 인식되거나 끊기면 0.3초 후 자동으로 마이크 재가동
           setTimeout(() => {
             if (isAutoRestart) {
               try { recognition.start(); } catch(e) {}
@@ -75,7 +73,6 @@
       };
 
       recognition.onerror = function(event) {
-        // no-speech 오류는 소리가 안 들려 타임아웃된 것이므로 로그 생략 후 자동 재시작
         if (event.error === 'no-speech') {
           return;
         }
