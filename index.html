@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <h2>🎙️ 무선 음성 입력기 (v4)</h2>
+  <h2>🎙️ 무선 음성 입력기 (v5 대답 필터 보강)</h2>
   <div id="status" class="status-box stopped">🔴 음성 감지 정지됨</div>
   
   <button class="btn-start" onclick="startRecognition()">🟢 업무 시작 (음성 감지)</button>
@@ -30,7 +30,6 @@
   <div id="log"></div>
 
   <script>
-    // ★ 구글 앱스 스크립트 웹 앱 URL
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxzeAcbPLm29lVgz1pds9dPB0vAStIwovZnTc-Id74RwuQhPpDS-5Y_RW309KUTFxLQ/exec";
 
     let recognition;
@@ -50,8 +49,7 @@
       recognition.onresult = function(event) {
         try {
           const lastIndex = event.results.length - 1;
-          // ★ [핵심 수정] event.results[lastIndex][0].transcript 구문으로 배열 인덱스 [0] 추가
-          const text = event.results[lastIndex][0].transcript.trim();
+          const text = event.results[lastIndex].transcript.trim();
           addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
           processVoiceText(text);
         } catch(e) {
@@ -73,16 +71,14 @@
       };
 
       recognition.onerror = function(event) {
-        if (event.error === 'no-speech') {
-          return;
-        }
+        if (event.error === 'no-speech') return;
         addLog("❌ 마이크 에러: " + event.error, "log-err");
         if (isAutoRestart && event.error !== 'not-allowed') {
           setTimeout(() => { if (isAutoRestart) recognition.start(); }, 1000);
         }
       };
     } else {
-      alert("이 브라우저는 음성 인식을 지원하지 않습니다. 모바일 크롬 또는 사파리를 사용해 주세요.");
+      alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
     }
 
     function startRecognition() {
@@ -113,7 +109,11 @@
     }
 
     function processVoiceText(text) {
-      let cleanedName = text.replace(/환자|님|들어오세요|다음|입니다/g, '').trim();
+      // ★ 환자 대답에 자주 포함되는 접두사/접미사 완벽 제거
+      let cleanedName = text
+        .replace(/저는|이름은|성함은|환자|님|들어오세요|다음/g, '')
+        .replace(/입니다|인데요|이요|이라고 합니다|라구요|이구요|요/g, '')
+        .trim();
       
       if (cleanedName.length >= 2 && cleanedName.length <= 4) {
         addLog("✨ 이름 추출: [" + cleanedName + "] ➔ 구글 시트 전송 중...", "log-success");
@@ -126,7 +126,7 @@
             addLog("❌ 전송 실패: " + err.message, "log-err");
           });
       } else {
-        addLog("ℹ️ [" + cleanedName + "]: 2~4글자 조건에 맞지 않아 전송 제외됨");
+        addLog("ℹ️ [" + text + " ➔ " + cleanedName + "]: 2~4글자 조건 미충족 제외");
       }
     }
 
