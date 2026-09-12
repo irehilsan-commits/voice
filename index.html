@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <h2>🎙️ 무선 음성 입력기 (v5 대답 필터 보강)</h2>
+  <h2>🎙️ 무선 음성 입력기 (v6 최종 수정)</h2>
   <div id="status" class="status-box stopped">🔴 음성 감지 정지됨</div>
   
   <button class="btn-start" onclick="startRecognition()">🟢 업무 시작 (음성 감지)</button>
@@ -49,9 +49,12 @@
       recognition.onresult = function(event) {
         try {
           const lastIndex = event.results.length - 1;
-          const text = event.results[lastIndex].transcript.trim();
-          addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
-          processVoiceText(text);
+          // ★ [핵심 수정] [0] 인덱스 및 존재 여부 검사를 추가하여 transcript 읽기 오류 완전 방지
+          if (event.results[lastIndex] && event.results[lastIndex][0]) {
+            const text = event.results[lastIndex][0].transcript.trim();
+            addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
+            processVoiceText(text);
+          }
         } catch(e) {
           addLog("❌ 결과 처리 중 오류: " + e.message, "log-err");
         }
@@ -109,7 +112,6 @@
     }
 
     function processVoiceText(text) {
-      // ★ 환자 대답에 자주 포함되는 접두사/접미사 완벽 제거
       let cleanedName = text
         .replace(/저는|이름은|성함은|환자|님|들어오세요|다음/g, '')
         .replace(/입니다|인데요|이요|이라고 합니다|라구요|이구요|요/g, '')
