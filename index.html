@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <h2>🎙️ 무선 음성 입력기 (v8 질문어/성씨 정밀 필터)</h2>
+  <h2>🎙️ 무선 음성 입력기 (v9 안정화)</h2>
   <div id="status" class="status-box stopped">🔴 음성 감지 정지됨</div>
   
   <button class="btn-start" onclick="startRecognition()">🟢 업무 시작 (음성 감지)</button>
@@ -43,14 +43,16 @@
       recognition.continuous = false;
 
       recognition.onstart = function() {
+        updateStatus(true);
         addLog("▶️ 마이크 활성화됨 (소리를 들을 준비 완료)");
       };
 
       recognition.onresult = function(event) {
         try {
           const lastIndex = event.results.length - 1;
-          if (event.results[lastIndex] && event.results[lastIndex][0]) {
-            const text = event.results[lastIndex][0].transcript.trim();
+          const res = event.results[lastIndex];
+          if (res && res[0] && res[0].transcript) {
+            const text = res[0].transcript.trim();
             addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
             processVoiceText(text);
           }
@@ -75,19 +77,52 @@
       recognition.onerror = function(event) {
         if (event.error === 'no-speech') return;
         addLog("❌ 마이크 에러: " + event.error, "log-err");
-        if (isAutoRestart && event.error !== 'not-allowed') {
+        if (event.error === 'not-allowed') {
+          isAutoRestart = false;
+          updateStatus(false);
+          alert("마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 허용을 확인해 주세요.");
+        } else if (isAutoRestart) {
           setTimeout(() => { if (isAutoRestart) recognition.start(); }, 1000);
         }
       };
     } else {
-      alert("이 브라우저는 음성 인식을 지원하지 않습니다.");
+      alert("이 브라우저는 음성 인식을 지원하지 않습니다. 크롬 또는 사파리를 사용해 주세요.");
     }
 
     // ★ 대한민국 주요 성씨 검증 정규식 (성씨로 시작하는 2~4글자 이름)
     const KOREAN_NAME_REGEX = /^(남궁|황보|제갈|선우|독고|사공|[김이박최정강조윤장임한오서신권황안송류유홍전고문손양배조백허유남심노하곽성차주우구신임나전민유진지엄채원천방공강현함변염양변여추노도소신석선설마길주연방위표명기반왕금옥육인맹제모탁국여진어은편])[가-힣]{1,3}$/;
 
+    function startRecognition() {
+      if (!recognition) return;
+      isAutoRestart = true;
+      try {
+        recognition.start();
+        updateStatus(true);
+        requestWakeLock();
+      } catch (e) {
+        addLog("ℹ️ 이미 감지 작동 중입니다.");
+      }
+    }
+
+    function stopRecognition() {
+      isAutoRestart = false;
+      if (recognition) recognition.stop();
+      updateStatus(false);
+    }
+
+    function updateStatus(listening) {
+      const statusDiv = document.getElementById('status');
+      if (listening) {
+        statusDiv.className = 'status-box listening';
+        statusDiv.innerHTML = '🟢 음성 감지 중 (대기 상태)';
+      } else {
+        statusDiv.className = 'status-box stopped';
+        statusDiv.innerHTML = '🔴 음성 감지 정지됨';
+      }
+    }
+
     function processVoiceText(text) {
-      // 1. 원장님 질문 및 안내 멘트 제거
+      // 1. 원장님 질문 및 기타 잡어 삭제
       let cleanedName = text
         .replace(/성함이\s*어떻게\s*되세요|성함이\s*어떻게\s*되시죠|성함이\s*어떻게\s*되나요|성함이|이름이\s*어떻게\s*되세요|이름이|어떻게\s*되세요|어떻게\s*되시죠|어떻게\s*되나요/g, '')
         .replace(/안녕하세요|안녕하세|반갑습니다|어서오세요|네네|잠시만요/g, '')
@@ -95,7 +130,7 @@
         .replace(/입니다|인데요|이요|이라고 합니다|라구요|이구요|요|네/g, '')
         .trim();
 
-      // 2. 대한민국 성씨 검증 (조건에 맞는 한국 이름만 통과)
+      // 2. 대한민국 성씨 검증
       if (KOREAN_NAME_REGEX.test(cleanedName)) {
         addLog("✨ 이름 추출 성공: [" + cleanedName + "] ➔ 구글 시트 전송 중...", "log-success");
         
