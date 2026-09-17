@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🎙️ 무선 음성 입력기 (v17 - 전송 성공 로그 전용)</title>
+  <title>🎙️ 무선 음성 입력기 (v18 - 수정완료)</title>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background-color: #f0f4f8; color: #333; }
     .container { max-width: 650px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
@@ -23,8 +23,8 @@
 </head>
 <body>
   <div class="container">
-    <h2>🎙️ 환자 이름 음성 입력기 (v17)</h2>
-    <p class="desc">초기 시작 안내 문구 없이, 환자 이름 전송 성공 기록만 깔끔하게 표시됩니다.</p>
+    <h2>🎙️ 환자 이름 음성 입력기 (v18)</h2>
+    <p class="desc">성씨 검증 오타 수정 완료! 환자 이름 전송 성공 기록만 깔끔하게 표시됩니다.</p>
 
     <div id="status" class="status-box stopped">🔴 음성 감지 정지됨</div>
     
@@ -52,7 +52,6 @@
 
       recognition.onstart = function() {
         updateStatus(true);
-        // 시작 안내 메시지 출력 안 함 (완전 클린 화면 유지)
       };
 
       recognition.onresult = function(event) {
@@ -119,7 +118,8 @@
       if (!name || name.length !== 3) return false;
       if (EXCLUDED_WORDS.includes(name)) return false;
       if (DOUBLE_SURNAMES.includes(name.substring(0, 2))) return true;
-      if (KOREAN_SURNAMES.includes(name)) return true;
+      // [수정 포인트] 3글자 이름의 '첫 번째 글자(성씨)'가 성씨 목록에 있는지 확인
+      if (KOREAN_SURNAMES.includes(name.charAt(0))) return true;
       return false;
     }
 
@@ -175,7 +175,7 @@
           .trim();
       }
 
-      // 성씨 기반 검증 통과 시에만 로그 출력 및 전송
+      // 성씨 기반 검증 통과 시에만 전송 완료 로그 출력
       if (isValidKoreanName(extractedCandidate)) {
         addLog("✨ [환자 이름 추출] " + extractedCandidate + " ➔ 구글 시트 전송 완료", "log-success");
         
