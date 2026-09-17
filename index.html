@@ -1,4 +1,3 @@
-html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -52,8 +51,8 @@ html
         try {
           const lastIndex = event.results.length - 1;
           const res = event.results[lastIndex];
-          if (res && res && res.transcript) {
-            const text = res.transcript.trim();
+          if (res && res[0] && res[0].transcript) {
+            const text = res[0].transcript.trim();
             addLog("🎤 인식된 음성: [" + text + "]", "log-raw");
             processVoiceText(text);
           }
@@ -124,4 +123,16 @@ html
       if (cssClass) p.className = cssClass;
       p.style.margin = "4px 0";
       p.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
-      logDiv.
+      logDiv.prepend(p);
+    }
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {}
+    }
+  </script>
+</body>
+</html>
