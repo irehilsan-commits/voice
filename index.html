@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🎙️ 무선 음성 입력기 (v16 - 이름 전송 기록 전용)</title>
+  <title>🎙️ 무선 음성 입력기 (v17 - 전송 성공 로그 전용)</title>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background-color: #f0f4f8; color: #333; }
     .container { max-width: 650px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
@@ -23,8 +23,8 @@
 </head>
 <body>
   <div class="container">
-    <h2>🎙️ 환자 이름 음성 입력기 (v16)</h2>
-    <p class="desc">정상적으로 인식되어 전송된 환자 이름만 실시간 기록에 표시됩니다.</p>
+    <h2>🎙️ 환자 이름 음성 입력기 (v17)</h2>
+    <p class="desc">초기 시작 안내 문구 없이, 환자 이름 전송 성공 기록만 깔끔하게 표시됩니다.</p>
 
     <div id="status" class="status-box stopped">🔴 음성 감지 정지됨</div>
     
@@ -52,6 +52,7 @@
 
       recognition.onstart = function() {
         updateStatus(true);
+        // 시작 안내 메시지 출력 안 함 (완전 클린 화면 유지)
       };
 
       recognition.onresult = function(event) {
@@ -60,7 +61,6 @@
           const res = event.results[lastIndex];
           if (res && res[0] && res[0].transcript) {
             const text = res[0].transcript.trim();
-            // 모든 일반 소리는 화면에 표시하지 않고 이름 추출 검사만 수행
             processVoiceText(text);
           }
         } catch(e) {}
@@ -119,7 +119,7 @@
       if (!name || name.length !== 3) return false;
       if (EXCLUDED_WORDS.includes(name)) return false;
       if (DOUBLE_SURNAMES.includes(name.substring(0, 2))) return true;
-      if (KOREAN_SURNAMES.includes(name[0])) return true;
+      if (KOREAN_SURNAMES.includes(name)) return true;
       return false;
     }
 
@@ -184,7 +184,6 @@
             addLog("❌ 전송 실패: " + err.message, "log-err");
           });
       }
-      // 이름이 아닌 일반 잡음/대화는 로그 출력 없이 그냥 무시함
     }
 
     function addLog(msg, cssClass) {
